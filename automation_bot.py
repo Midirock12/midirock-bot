@@ -20,7 +20,7 @@ from io import BytesIO
 import feedparser
 from PIL import Image, ImageDraw, ImageFont
 from telegram import Update
-from telegram.ext import ApplicationBuilder, CommandHandler, ContextTypes
+from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 # ---------------- CONFIGURATION ----------------
@@ -116,7 +116,7 @@ def main():
     app = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("postphoto", handle_photo))
+    app.add_handler(MessageHandler(filters.PHOTO, handle_photo))
 
     print("Bot runs successfully...")
     app.run_polling()
