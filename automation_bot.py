@@ -24,7 +24,7 @@ def run_health_check_server():
 threading.Thread(target=run_health_check_server, daemon=True).start()
 
 # Configuration
-BOT_TOKEN = "8779428741:AAHCd-ICROKeXk3CKfgBiGrPXcSJ-I1jBIA"
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "8779428741:AAHCd-ICROKeXk3CKfgBiGrPXcSJ-I1jBIA")
 CHANNEL_ID = "@Midirock_Online"
 RSS_URL = "https://feeds.feedburner.com/TechCrunch/"
 WATERMARK_TEXT = "@Midirock"
@@ -36,11 +36,8 @@ def add_watermark(image_bytes, text):
     txt_layer = Image.new("RGBA", image.size, (255, 255, 255, 0))
     draw = ImageDraw.Draw(txt_layer)
     
-    font_size = int(image.size[0] * 0.08)
-    try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", font_size)
-    except IOError:
-        font = ImageFont.load_default()
+    # Render ላይ ደህንነቱ የተጠበቀ Default Font መጠቀም
+    font = ImageFont.load_default()
         
     x = int(image.size[0] * 0.05)
     y = int(image.size[1] * 0.85)
@@ -58,32 +55,42 @@ last_rss_link = None
 
 async def fetch_and_post_rss(context: ContextTypes.DEFAULT_TYPE):
     global last_rss_link
-    feed = feedparser.parse(RSS_URL)
-    if feed.entries:
-        latest_entry = feed.entries[0]
-        if latest_entry.link != last_rss_link:
-            last_rss_link = latest_entry.link
-            message = f"📢 **አዲስ መረጃ!**\n\n🔹 **{latest_entry.title}**\n\n🔗 [ሙሉውን ለማንበብ ይጫኑ]({latest_entry.link})"
-            await context.bot.send_message(chat_id=CHANNEL_ID, text=message, parse_mode="Markdown")
+    try:
+        feed = feedparser.parse(RSS_URL)
+        if feed.entries:
+            latest_entry = feed.entries[0]
+            if latest_entry.link != last_rss_link:
+                last_rss_link = latest_entry.link
+                message = f"📢 **አዲስ መረጃ!**\n\n🔹 **{latest_entry.title}**\n\n🔗 [ሙሉውን ለማንበብ ይጫኑ]({latest_entry.link})"
+                await context.bot.send_message(chat_id=CHANNEL_ID, text=message, parse_mode="Markdown")
+    except Exception as e:
+        logging.error(f"RSS Error: {e}")
 
 async def daily_scheduled_post(context: ContextTypes.DEFAULT_TYPE):
-    daily_message = f"🌟 **መልካም ቀን ለቻናላችን ተከታታዮች!**\n\nዛሬም አዳዲስ እና ጠቃሚ መረጃዎችን ይዘንላችሁ እንቀርባለን። ከእኛ ጋር ይቆዩ! ✨"
-    await context.bot.send_message(chat_id=CHANNEL_ID, text=daily_message, parse_mode="Markdown")
+    try:
+        daily_message = f"🌟 **መልካም ቀን ለቻናላችን ተከታታዮች!**\n\nዛሬም አዳዲስ እና ጠቃሚ መረጃዎችን ይዘንላችሁ እንቀርባለን። ከእኛ ጋር ይቆዩ! ✨"
+        await context.bot.send_message(chat_id=CHANNEL_ID, text=daily_message, parse_mode="Markdown")
+    except Exception as e:
+        logging.error(f"Daily Post Error: {e}")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("Selam! Midirock Content Automation Bot ዝግጁ ነው። ፎቶ ሲልኩልኝ ዋተርማርክ አድርጌ ወደ ቻናል እልካለሁ!")
 
 async def handle_photo(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.photo:
-        await update.message.reply_text("⏳ ፎቶውን በመቀበል ላይ... ዋተርማርክ እየተደረገበት ነው...")
-        photo_file = await update.message.photo[-1].get_file()
-        photo_bytes = await photo_file.download_as_bytearray()
-        
-        processed_photo = add_watermark(photo_bytes, WATERMARK_TEXT)
-        caption = update.message.caption or f"📸 {WATERMARK_TEXT}"
-        
-        await context.bot.send_photo(chat_id=CHANNEL_ID, photo=processed_photo, caption=caption)
-        await update.message.reply_text("✅ ፎቶው በስኬት ዋተርማርክ ተደርጎ ወደ ቻናሉ ተልኳል!")
+    try:
+        if update.message.photo:
+            await update.message.reply_text("⏳ ፎቶውን በመቀበል ላይ... ዋተርማርክ እየተደረገበት ነው...")
+            photo_file = await update.message.photo[-1].get_file()
+            photo_bytes = await photo_file.download_as_bytearray()
+            
+            processed_photo = add_watermark(photo_bytes, WATERMARK_TEXT)
+            caption = update.message.caption or f"📸 {WATERMARK_TEXT}"
+            
+            await context.bot.send_photo(chat_id=CHANNEL_ID, photo=processed_photo, caption=caption)
+            await update.message.reply_text("✅ ፎቶው በስኬት ዋተርማርክ ተደርጎ ወደ ቻናሉ ተልኳል!")
+    except Exception as e:
+        logging.error(f"Photo Processing Error: {e}")
+        await update.message.reply_text(f"❌ ስህተት ተፈጠረ፦ {e}")
 
 async def post_init(application):
     scheduler = AsyncIOScheduler()
